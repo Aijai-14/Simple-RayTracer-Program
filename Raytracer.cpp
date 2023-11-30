@@ -9,8 +9,12 @@
 #include <map>
 #include <cstring> // Include for strcmp
 #include "RayClass.h"
+#include <cmath>
 
 const int MAX_DEPTH = 4;
+std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>> geometryData;
+std::map<std::string, std::vector<std::variant<float, std::vector<float>>>> lightData;
+std::vector<float> background;
 
 void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std::string,
         std::vector<std::variant<float, int, std::vector<float>>>>& gD,
@@ -195,9 +199,36 @@ void printSceneData(float* vP, int* res, std::map<std::string,
     }
 }
 
-//const Ray& ray
-void Intersect(std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>>& spheres)
+float solveT(const Ray& ray)
 {
+    float a = dot(ray.getDirection(), ray.getDirection());
+    float b = 2 * dot(ray.getPoint(), ray.getDirection());
+    float c = dot(ray.getPoint(), ray.getPoint()) - 1;
+
+    float discriminant = (float) pow(b, 2) - 4 * a * c;
+    if (discriminant < 0)
+    {
+        return -INFINITY;
+    }
+
+    else if (discriminant == 0)
+    {
+        return (-b / (2*a));
+    }
+
+    else
+    {
+        float t1 = (-b + sqrt(discriminant)) / (2*a);
+        float t2 = (-b - sqrt(discriminant)) / (2*a);
+
+        if (t1 < t2) {return t1;}
+        else {return t2;}
+    }
+}
+
+std::vector<float> Intersect(Ray& ray, std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>>& spheres)
+{
+    std::vector<float> closest = {0.0f, 0.0f, 0.0f};
     for (const auto& sphere : spheres)
     {
         std::vector<float> position = reinterpret_cast<const std::vector<float> &>(sphere.second.at(0));
@@ -208,20 +239,43 @@ void Intersect(std::map<std::string, std::vector<std::variant<float, int, std::v
         double M_inverse[4][4] = {{0}};
         invert_matrix(M, M_inverse);
 
+        Ray transRay = ray.getTransformedRay(M_inverse);
 
+        float intersectionParameter = solveT(transRay);
+        if (intersectionParameter == -INFINITY) { continue; }
 
+        std::vector<float> intersectionPoint = ray.findPoint(intersectionParameter);
+
+        if (equal(closest, std::vector<float>{0.0f, 0.0f, 0.0f}))
+        {
+            closest = intersectionPoint;
+        }
+
+        else
+        {
+            if (closestToEye(intersectionPoint, closest))
+            {
+                closest = intersectionPoint;
+            }
+        }
     }
+
+    return closest;
 }
 
 
-void raytrace(const Ray& currRay)
-{
-//    if (currRay.getDepth() > MAX_DEPTH) {return Ray(std::vector<float>{0, 0, 0}, std::vector<float>{0, 0, 0});}
-
-
-
-}
-
+//std::vector<float> raytrace(Ray& currRay)
+//{
+//    if (currRay.getDepth() > MAX_DEPTH) {return std::vector<float>{0.0f, 0.0f, 0.0f};}
+//    std::vector<float> intersectPt = Intersect(currRay, geometryData);
+//    if (equal(intersectPt, std::vector<float>{0.0f, 0.0f, 0.0f}) && currRay.getDepth() == 1) {return background;}
+//
+//
+//
+//
+//
+//
+//}
 
 int main(int argc, char **argv)
 {
@@ -243,9 +297,9 @@ int main(int argc, char **argv)
     float viewPlane [5] = {};
     int resolution [2] = {};
     float ambient [3] = {};
-    std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>> geometryData;
-    std::map<std::string, std::vector<std::variant<float, std::vector<float>>>> lightData;
-    std::vector<float> background;
+//    std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>> geometryData;
+//    std::map<std::string, std::vector<std::variant<float, std::vector<float>>>> lightData;
+//    std::vector<float> background;
     std::string sceneName;
 
     // get the data from the text file and store it in arrays and hashmaps
@@ -257,7 +311,7 @@ int main(int argc, char **argv)
     // print scene data to test extraction
     //printSceneData(viewPlane, resolution, geometryData, lightData, background, ambient, sceneName);
 
-    Intersect(geometryData);
+//    Intersect(geometryData);
 
 //    std::vector<float> colours(3 * resolution[0] * resolution[1], 0.0f);
 //    for (int i = 0; i < resolution[0]; i++)

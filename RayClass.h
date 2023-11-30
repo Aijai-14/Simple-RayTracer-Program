@@ -8,12 +8,65 @@
 #ifndef SIMPLE_RAYTRACER_PROGRAM_RAYCLASS_H
 #define SIMPLE_RAYTRACER_PROGRAM_RAYCLASS_H
 
+bool closestToEye(std::vector<float> vec1, std::vector<float> vec2) {
+
+    auto dis1 = (float) sqrt(pow(vec1[0], 2) + pow(vec1[1], 2) + pow(vec1[2], 2));
+    auto dis2 = (float) sqrt(pow(vec2[0], 2) + pow(vec2[1], 2) + pow(vec2[2], 2));
+
+    if (dis1 < dis2) {return true;}
+    else {return false;}
+}
+
+bool equal(std::vector<float> vec1, std::vector<float> vec2)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        if (vec1[i] != vec2[i])
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+float dot(const double *vec1, std::vector<float> vec2)
+{
+
+    float product = 0.0f;
+    for (int i = 0; i < 4; i++)
+    {
+        product += (float) vec1[i] * vec2[i];
+    }
+    return product;
+}
+
+float dot(std::vector<float> vec1, std::vector<float> vec2)
+{
+
+    float product = 0.0f;
+    for (int i = 0; i < 3; i++)
+    {
+        product += vec1[i] * vec2[i];
+    }
+    return product;
+}
+
+std::vector<float> MatrixVectorMult(double M[][4], const std::vector<float>& vec)
+{
+    std::vector<float> output;
+    for (int i = 0; i < 4; i++)
+    {
+        output[i] = dot(M[i], vec);
+    }
+
+    return output;
+}
 
 class Ray {
     private:
         std::vector<float> point;
         std::vector<float> direction;
-        float t = 0;
         int depth = 0;
 
     public:
@@ -35,6 +88,44 @@ class Ray {
             return depth;
         }
 
+public:
+        Ray getTransformedRay(double M[][4])
+        {
+            std::vector<float> homogenousPos = point;
+            homogenousPos.push_back(1.0f);
+            std::vector<float> homogenousDir = direction;
+            homogenousDir.push_back(0.0f);
+
+            std::vector<float> homogenousTransPos = MatrixVectorMult(M, homogenousPos);
+            std::vector<float> homogenousTransDir = MatrixVectorMult(M, homogenousDir);
+
+            std::vector<float> TransPos = {homogenousTransPos[0], homogenousTransPos[1], homogenousTransPos[2]};
+            std::vector<float> TransDir = {homogenousTransDir[0], homogenousTransDir[1], homogenousTransDir[2]};
+
+            return {TransPos, TransDir};
+        }
+
+public:
+    const std::vector<float> &getPoint() const {
+        return point;
+    }
+
+public:
+    const std::vector<float> &getDirection() const {
+        return direction;
+    }
+
+public:
+    std::vector<float> findPoint(float t)
+    {
+       std::vector<float> pt = {0, 0, 0};
+       for (int i = 0; i < 3; i++)
+       {
+           pt[i] = point[i] + t * direction[i];
+       }
+
+        return pt;
+    }
 };
 
 /*------------------------------------------------------*/
@@ -147,5 +238,6 @@ void invert_matrix (double A[4][4], double Ainv[4][4]) {
         for(j=0; j<4; j++)
             Ainv[i][j] = Ainv[i][j] / det;
 }
+
 
 #endif //SIMPLE_RAYTRACER_PROGRAM_RAYCLASS_H
