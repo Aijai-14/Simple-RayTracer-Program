@@ -12,9 +12,16 @@
 #include <cmath>
 
 const int MAX_DEPTH = 4;
+
+// create array for near plane parameters, array for resolution, hashmaps for sphere data and light data, vector for
+// background colour, array for ambient light intensities, and string for output file name.
+float viewPlane [5] = {};
+int resolution [2] = {};
+float ambient [3] = {};
 std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>> geometryData;
 std::map<std::string, std::vector<std::variant<float, std::vector<float>>>> lightData;
 std::vector<float> background;
+std::string sceneName;
 
 void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std::string,
         std::vector<std::variant<float, int, std::vector<float>>>>& gD,
@@ -114,91 +121,6 @@ void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std:
     }
 }
 
-void printSceneData(float* vP, int* res, std::map<std::string,
-        std::vector<std::variant<float, int, std::vector<float>>>>& gD,
-        std::map<std::string, std::vector<std::variant<float, std::vector<float>>>>& lD,
-        std::vector<float>& bG, float* Ambient, std::string& Name)
-{
-    std::cout << Name << std::endl;
-    std::cout << "Plane Parameters: ";
-    for (int i = 0; i < 5; i++)
-    {
-        std::cout << vP[i] << " ";
-    }
-    std::cout << std::endl;
-    std::cout << "Resolution: ";
-    for (int i = 0; i < 2; i++)
-    {
-        std::cout << res[i] << " ";
-    }
-    std::cout << std::endl;
-    std::cout << "Ambient Intensities: ";
-    for (int i = 0; i < 3; i++)
-    {
-        std::cout << Ambient[i] << " ";
-    }
-    std::cout << std::endl;
-
-    std::cout << "Background Colour: ";
-    for (float colour : bG)
-    {
-        std::cout << colour << " ";
-    }
-    std::cout << std::endl;
-
-    for (const auto& entry : gD) {
-        const std::string& name = entry.first;
-        const std::vector<std::variant<float, int, std::vector<float>>>& values = entry.second;
-
-        // Print key
-        std::cout << "Sphere: " << name << std::endl;
-
-        // Loop through the values in the vector
-        for (const auto& value : values) {
-            if (std::holds_alternative<float>(value)) {
-                std::cout << "  Light Coefficients (adsr): " << std::get<float>(value) << std::endl;
-            }
-            else if (std::holds_alternative<int>(value)) {
-                std::cout << "  Shininess: " << std::get<int>(value) << std::endl;
-            }
-            else if (std::holds_alternative<std::vector<float>>(value)) {
-                const auto& innerVector = std::get<std::vector<float>>(value);
-                std::cout << "  Position/Scale/Colour: ";
-                for (float innerValue : innerVector) {
-                    std::cout << innerValue << " ";
-                }
-                std::cout << std::endl;
-            }
-        }
-        std::cout << std::endl;  // Add a separator between objects
-    }
-
-    for (const auto& entry : lD) {
-        const std::string& name = entry.first;
-        const std::vector<std::variant<float, std::vector<float>>>& values = entry.second;
-
-        // Print key
-        std::cout << "Light: " << name << std::endl;
-
-        // Loop through the values in the vector
-        for (const auto& value : values) {
-            if (std::holds_alternative<float>(value)) {
-                std::cout << "  Light Intensities (rgb): " << std::get<float>(value) << std::endl;
-            }
-
-            else if (std::holds_alternative<std::vector<float>>(value)) {
-                const auto& innerVector = std::get<std::vector<float>>(value);
-                std::cout << "  Position: ";
-                for (float innerValue : innerVector) {
-                    std::cout << innerValue << " ";
-                }
-                std::cout << std::endl;
-            }
-        }
-        std::cout << std::endl;  // Add a separator between objects
-    }
-}
-
 float solveT(const Ray& ray)
 {
     float a = dot(ray.getDirection(), ray.getDirection());
@@ -226,10 +148,11 @@ float solveT(const Ray& ray)
     }
 }
 
-std::vector<float> Intersect(Ray& ray, std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>>& spheres)
+std::vector<std::variant<std::vector<float>, std::string>> Intersect(Ray& ray)
 {
     std::vector<float> closest = {0.0f, 0.0f, 0.0f};
-    for (const auto& sphere : spheres)
+    std::vector<std::string> intersectedObjects = {};
+    for (const auto& sphere : geometryData)
     {
         std::vector<float> position = reinterpret_cast<const std::vector<float> &>(sphere.second.at(0));
         std::vector<float> scale = reinterpret_cast<const std::vector<float> &>(sphere.second.at(1));
@@ -249,6 +172,7 @@ std::vector<float> Intersect(Ray& ray, std::map<std::string, std::vector<std::va
         if (equal(closest, std::vector<float>{0.0f, 0.0f, 0.0f}))
         {
             closest = intersectionPoint;
+            intersectedObjects.push_back(sphere.first);
         }
 
         else
@@ -256,26 +180,99 @@ std::vector<float> Intersect(Ray& ray, std::map<std::string, std::vector<std::va
             if (closestToEye(intersectionPoint, closest))
             {
                 closest = intersectionPoint;
+                intersectedObjects.push_back(sphere.first);
             }
         }
     }
 
-    return closest;
+    std::vector<std::variant<std::vector<float>, std::string>> closestIntersection = {};
+    closestIntersection.push_back(closest);
+    closestIntersection.push_back(intersectedObjects.back());
+    return closestIntersection;
 }
 
+std::vector<float> reflectionVector(const std::vector<float>& normal, const std::vector<float>& lightVector)
+{
+    float num = 2 * dot(normal, lightVector);
+    scalarMult(num, normal);
+    std::vector<float> reflected = subtract(normal, lightVector);
 
-//std::vector<float> raytrace(Ray& currRay)
-//{
-//    if (currRay.getDepth() > MAX_DEPTH) {return std::vector<float>{0.0f, 0.0f, 0.0f};}
-//    std::vector<float> intersectPt = Intersect(currRay, geometryData);
-//    if (equal(intersectPt, std::vector<float>{0.0f, 0.0f, 0.0f}) && currRay.getDepth() == 1) {return background;}
-//
-//
-//
-//
-//
-//
-//}
+    normalize(normal);
+    return reflected;
+}
+
+std::vector<float> illuminate(Ray& viewRay, const std::vector<float>& point, std::vector<std::variant<float, std::vector<float>>>& obj)
+{
+    std::vector<float> viewDir = {((std::vector<float>) viewRay.getDirection())[0], ((std::vector<float>) viewRay.getDirection())[1],
+                                  ((std::vector<float>) viewRay.getDirection())[2]};
+
+    float Ka = (float&) (obj[3]);
+    std::vector<float> colour = (std::vector<float>&) obj[2];
+    std::vector<float> pixelColour = {Ka * ambient[0] * colour[0], Ka * ambient[1] * colour[1], Ka * ambient[2] * colour[2]};
+
+    for (const auto& light : lightData)
+    {
+        std::vector<float> currColour = {0.0f, 0.0f, 0.0f};
+        std::vector<float> lightPos = reinterpret_cast<const std::vector<float> &>(light.second[0]);
+        std::vector<float> shadowDir = {lightPos[0] - point[0], lightPos[1] - point[1], lightPos[2] - point[2]};
+
+        Ray shadowRay = Ray(point, shadowDir);
+        std::vector<std::variant<std::vector<float>, std::string>> intersection = Intersect(shadowRay);
+
+        if (equal((std::vector<float>&) intersection[0], std::vector<float>{0.0f, 0.0f, 0.0f}))
+        {
+            std::vector<float> center = (std::vector<float>&) obj[0];
+            std::vector<float> normal = {2 * (point[0] - center[0]), 2 * (point[1] - center[1]), 2 * (point[2] - center[2])};
+            normalize(viewDir);
+            normalize(shadowDir);
+            normalize(normal);
+            std::vector<float> reflected = reflectionVector(normal, shadowDir);
+
+            float Kd = (float&) (obj[4]);
+            float Ks = (float&) (obj[5]);
+            int shininess = (int&) obj[7];
+            float redIntensity = (float &) light.second[1];
+            float greenIntensity = (float &) light.second[2];
+            float blueIntensity = (float &) light.second[3];
+
+            float diffuseRed = Kd * redIntensity * (dot(normal, shadowDir)) * colour[0];
+            float specularRed = (float) (Ks * redIntensity * pow(dot(reflected, viewDir), shininess));
+            float diffuseGreen = Kd * greenIntensity * (dot(normal, shadowDir)) * colour[1];
+            float specularGreen = (float) (Ks * greenIntensity * pow(dot(reflected, viewDir), shininess));
+            float diffuseBlue = Kd * blueIntensity * (dot(normal, shadowDir)) * colour[2];
+            float specularBlue = (float) (Ks * blueIntensity * pow(dot(reflected, viewDir), shininess));
+
+            currColour[0] = diffuseRed + specularRed;
+            currColour[1] = diffuseGreen + specularGreen;
+            currColour[2] = diffuseBlue + specularBlue;
+        }
+
+        for (int i = 0; i < 3; i++)
+        {
+            pixelColour[i] += currColour[i];
+        }
+    }
+
+    return pixelColour;
+}
+
+std::vector<float> raytrace(Ray& currRay)
+{
+    if (currRay.getDepth() > MAX_DEPTH) {return std::vector<float>{0.0f, 0.0f, 0.0f};}
+
+    std::vector<std::variant<std::vector<float>, std::string>> intersectInfo = Intersect(currRay);
+    std::vector<float> intersectPt = (std::vector<float>&) intersectInfo[0];
+    std::vector<std::variant<float, std::vector<float>>> intersectObj =
+            reinterpret_cast<const std::vector<std::variant<float, std::vector<float>>> &>(geometryData.at((std::string &) intersectInfo[1]));
+
+
+    if (equal((std::vector<float>&) intersectInfo[0], std::vector<float>{0.0f, 0.0f, 0.0f}) && currRay.getDepth() == 1)
+    {return background;}
+
+    std::vector<float> clocal = illuminate(currRay, intersectPt, intersectObj);
+
+
+}
 
 int main(int argc, char **argv)
 {
@@ -292,43 +289,32 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // create array for near plane parameters, array for resolution, hashmaps for sphere data and light data, vector for
-    // background colour, array for ambient light intensities, and string for output file name.
-    float viewPlane [5] = {};
-    int resolution [2] = {};
-    float ambient [3] = {};
-//    std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>> geometryData;
-//    std::map<std::string, std::vector<std::variant<float, std::vector<float>>>> lightData;
-//    std::vector<float> background;
-    std::string sceneName;
-
     // get the data from the text file and store it in arrays and hashmaps
     getSceneInfo(sceneData, viewPlane, resolution, ambient,geometryData, lightData, background, sceneName);
-
     // close input file
     fclose(sceneData);
 
-    // print scene data to test extraction
-    //printSceneData(viewPlane, resolution, geometryData, lightData, background, ambient, sceneName);
+    std::vector<float> colours(3 * resolution[0] * resolution[1], 0.0f);
+    int counter = 0;
+    for (int i = 0; i < resolution[0]; i++)
+    {
+        for (int j = 0; j < resolution[1]; j++)
+        {
+            float dirX = viewPlane[2] * (((float) (2 * i) / (float) resolution[0]) - 1);
+            float dirY = viewPlane[4] * (((float) (2 * j) / (float) resolution[1]) - 1);
+            float dirZ = (-1) * viewPlane[0];
+            Ray ray = Ray(std::vector<float>{0, 0, 0}, std::vector<float>{dirX, dirY, dirZ});
 
-//    Intersect(geometryData);
+            ray.setDepth(1);
 
-//    std::vector<float> colours(3 * resolution[0] * resolution[1], 0.0f);
-//    for (int i = 0; i < resolution[0]; i++)
-//    {
-//        for (int j = 0; j < resolution[1]; j++)
-//        {
-//            float dirX = viewPlane[2] * (((float) (2 * i) / (float) resolution[0]) - 1);
-//            float dirY = viewPlane[4] * (((float) (2 * j) / (float) resolution[1]) - 1);
-//            float dirZ = (-1) * viewPlane[0];
-//            Ray ray = Ray(std::vector<float>{0, 0, 0}, std::vector<float>{dirX, dirY, dirZ});
-//
-//            ray.setDepth(1);
-//
-////            tracedRay = raytrace(ray);
-//
-//        }
-//    }
+            std::vector<float> screenColour = raytrace(ray);
+
+            colours[counter] = screenColour[0];
+            colours[counter+1] = screenColour[1];
+            colours[counter+2] = screenColour[2];
+            counter += 3;
+        }
+    }
 
     return 0;
 }

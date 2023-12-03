@@ -8,6 +8,26 @@
 #ifndef SIMPLE_RAYTRACER_PROGRAM_RAYCLASS_H
 #define SIMPLE_RAYTRACER_PROGRAM_RAYCLASS_H
 
+std::vector<float> subtract(std::vector<float> vec1, std::vector<float> vec2)
+{
+    return std::vector<float>{vec1[0] - vec2[0], vec1[1] - vec2[1], vec1[2] - vec2[2]};
+}
+
+void scalarMult(float constant, std::vector<float> vec)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        vec[i] = constant * vec[i];
+    }
+}
+
+void normalize(std::vector<float> vec)
+{
+    auto magnitude = (float) sqrt(pow(vec[0], 2) + pow(vec[1], 2) + pow(vec[2], 2));
+    auto inverse_magnitude = (float) pow(magnitude, -1);
+    scalarMult(inverse_magnitude, vec);
+}
+
 bool closestToEye(std::vector<float> vec1, std::vector<float> vec2) {
 
     auto dis1 = (float) sqrt(pow(vec1[0], 2) + pow(vec1[1], 2) + pow(vec1[2], 2));
