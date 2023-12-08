@@ -21,12 +21,12 @@ float ambient [3] = {};
 std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>> geometryData;
 std::map<std::string, std::vector<std::variant<float, std::vector<float>>>> lightData;
 std::vector<float> background;
-char* sceneName;
+char sceneName[20];
 
 void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std::string,
         std::vector<std::variant<float, int, std::vector<float>>>>& gD,
         std::map<std::string, std::vector<std::variant<float, std::vector<float>>>>& lD,
-        std::vector<float>& bG, const char* Name)
+        std::vector<float>& bG, char* Name)
 {
     char line[100];
     float num = 0.0;
@@ -110,9 +110,7 @@ void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std:
 
         else if (strcmp(temp, "OUTPUT") == 0)
         {
-            char outputFile[20];
-            sscanf(line, "OUTPUT %s", outputFile);
-            Name = outputFile;
+            sscanf(line, "OUTPUT %s", Name);
         }
 
         else {
@@ -135,7 +133,8 @@ float solveT(const Ray& ray)
 
     else if (discriminant == 0)
     {
-        return (-b / (2*a));
+        if ((-b / (2*a)) > 1) {return (-b / (2*a));}
+        else {return -INFINITY;}
     }
 
     else
@@ -143,8 +142,9 @@ float solveT(const Ray& ray)
         float t1 = (-b + sqrt(discriminant)) / (2*a);
         float t2 = (-b - sqrt(discriminant)) / (2*a);
 
-        if (t1 < t2) {return t1;}
-        else {return t2;}
+        if (t1 < t2 && t1 > 1) {return t1;}
+        else if (t2 < t1 && t2 > 1) {return t2;}
+        else {return -INFINITY;}
     }
 }
 
@@ -186,8 +186,16 @@ std::vector<std::variant<std::vector<float>, std::string>> Intersect(Ray& ray)
     }
 
     std::vector<std::variant<std::vector<float>, std::string>> closestIntersection = {};
-    closestIntersection.push_back(closest);
-    closestIntersection.push_back(intersectedObjects.back());
+    if (equal(closest, std::vector<float>({0.0f, 0.0f, 0.0f})))
+    {
+        closestIntersection.push_back(closest);
+    }
+    else
+    {
+        closestIntersection.push_back(closest);
+        closestIntersection.push_back(intersectedObjects.back());
+    }
+
     return closestIntersection;
 }
 
@@ -265,12 +273,12 @@ std::vector<float> raytrace(Ray& currRay)
 
     std::vector<std::variant<std::vector<float>, std::string>> intersectInfo = Intersect(currRay);
     std::vector<float> intersectPt = (std::vector<float>&) intersectInfo[0];
+
+    if (equal((std::vector<float>&) intersectInfo[0], std::vector<float>{0.0f, 0.0f, 0.0f}) || currRay.getDepth() == 1)
+    {return background;}
+
     std::vector<std::variant<float, std::vector<float>>> intersectObj =
             reinterpret_cast<const std::vector<std::variant<float, std::vector<float>>> &>(geometryData.at((std::string &) intersectInfo[1]));
-
-
-    if (equal((std::vector<float>&) intersectInfo[0], std::vector<float>{0.0f, 0.0f, 0.0f}) && currRay.getDepth() == 1)
-    {return background;}
 
     // calculate normal to intersected sphere
     std::vector<float> center = (std::vector<float>&) intersectObj[0];
@@ -324,7 +332,7 @@ int main(int argc, char **argv)
             float dirX = viewPlane[2] * (((float) (2 * i) / (float) resolution[0]) - 1);
             float dirY = viewPlane[4] * (((float) (2 * j) / (float) resolution[1]) - 1);
             float dirZ = (-1) * viewPlane[0];
-            Ray ray = Ray(std::vector<float>{0, 0, 0}, std::vector<float>{dirX, dirY, dirZ});
+            Ray ray = Ray(std::vector<float>{0.000001, 0.000001, 0.000001}, std::vector<float>{dirX, dirY, dirZ});
 
             ray.setDepth(1);
 
@@ -338,6 +346,8 @@ int main(int argc, char **argv)
     }
 
     save_imageP6(resolution[0], resolution[1], sceneName, colours);
+    char debugfile[10] = "Debug.txt";
+    save_imageP3(resolution[0], resolution[1], debugfile, colours);
 
     return 0;
 }

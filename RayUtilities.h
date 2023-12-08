@@ -137,7 +137,7 @@ float dot(std::vector<float> vec1, std::vector<float> vec2)
 
 std::vector<float> MatrixVectorMult(double M[][4], const std::vector<float>& vec)
 {
-    std::vector<float> output;
+    std::vector<float> output = {0.0f, 0.0f, 0.0f, 0.0f};
     for (int i = 0; i < 4; i++)
     {
         output[i] = dot(M[i], vec);
