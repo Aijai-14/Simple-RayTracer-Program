@@ -3,4 +3,4 @@ project(Simple-RayTracer-Program CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(Simple-RayTracer-Program Raytracer.cpp RayClass.h)
+add_executable(Simple-RayTracer-Program Raytracer.cpp RayUtilities.h)

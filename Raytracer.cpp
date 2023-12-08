@@ -8,7 +8,7 @@
 #include <variant>
 #include <map>
 #include <cstring> // Include for strcmp
-#include "RayClass.h"
+#include "RayUtilities.h"
 #include <cmath>
 
 const int MAX_DEPTH = 4;
@@ -21,12 +21,12 @@ float ambient [3] = {};
 std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>> geometryData;
 std::map<std::string, std::vector<std::variant<float, std::vector<float>>>> lightData;
 std::vector<float> background;
-std::string sceneName;
+char* sceneName;
 
 void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std::string,
         std::vector<std::variant<float, int, std::vector<float>>>>& gD,
         std::map<std::string, std::vector<std::variant<float, std::vector<float>>>>& lD,
-        std::vector<float>& bG, std::string& Name)
+        std::vector<float>& bG, const char* Name)
 {
     char line[100];
     float num = 0.0;
@@ -201,14 +201,20 @@ std::vector<float> reflectionVector(const std::vector<float>& normal, const std:
     return reflected;
 }
 
-std::vector<float> illuminate(Ray& viewRay, const std::vector<float>& point, std::vector<std::variant<float, std::vector<float>>>& obj)
+std::vector<float> illuminate(Ray& viewRay, const std::vector<float>& normal, const std::vector<float>& point, std::vector<std::variant<float, std::vector<float>>>& obj)
 {
     std::vector<float> viewDir = {((std::vector<float>) viewRay.getDirection())[0], ((std::vector<float>) viewRay.getDirection())[1],
                                   ((std::vector<float>) viewRay.getDirection())[2]};
+    normalize(viewDir);
+    normalize(normal);
 
     float Ka = (float&) (obj[3]);
     std::vector<float> colour = (std::vector<float>&) obj[2];
     std::vector<float> pixelColour = {Ka * ambient[0] * colour[0], Ka * ambient[1] * colour[1], Ka * ambient[2] * colour[2]};
+
+    float Kd = (float&) (obj[4]);
+    float Ks = (float&) (obj[5]);
+    int shininess = (int&) obj[7];
 
     for (const auto& light : lightData)
     {
@@ -221,16 +227,9 @@ std::vector<float> illuminate(Ray& viewRay, const std::vector<float>& point, std
 
         if (equal((std::vector<float>&) intersection[0], std::vector<float>{0.0f, 0.0f, 0.0f}))
         {
-            std::vector<float> center = (std::vector<float>&) obj[0];
-            std::vector<float> normal = {2 * (point[0] - center[0]), 2 * (point[1] - center[1]), 2 * (point[2] - center[2])};
-            normalize(viewDir);
             normalize(shadowDir);
-            normalize(normal);
             std::vector<float> reflected = reflectionVector(normal, shadowDir);
 
-            float Kd = (float&) (obj[4]);
-            float Ks = (float&) (obj[5]);
-            int shininess = (int&) obj[7];
             float redIntensity = (float &) light.second[1];
             float greenIntensity = (float &) light.second[2];
             float blueIntensity = (float &) light.second[3];
@@ -253,12 +252,16 @@ std::vector<float> illuminate(Ray& viewRay, const std::vector<float>& point, std
         }
     }
 
+    if (pixelColour[0] > 1.0) {pixelColour[0] = 1.0;}
+    else if (pixelColour[1] > 1.0) {pixelColour[1] = 1.0;}
+    else if (pixelColour[2] > 1.0) {pixelColour[2] = 1.0;}
+
     return pixelColour;
 }
 
 std::vector<float> raytrace(Ray& currRay)
 {
-    if (currRay.getDepth() > MAX_DEPTH) {return std::vector<float>{0.0f, 0.0f, 0.0f};}
+    if (currRay.getDepth() >= MAX_DEPTH) {return std::vector<float>{0.0f, 0.0f, 0.0f};}
 
     std::vector<std::variant<std::vector<float>, std::string>> intersectInfo = Intersect(currRay);
     std::vector<float> intersectPt = (std::vector<float>&) intersectInfo[0];
@@ -269,9 +272,26 @@ std::vector<float> raytrace(Ray& currRay)
     if (equal((std::vector<float>&) intersectInfo[0], std::vector<float>{0.0f, 0.0f, 0.0f}) && currRay.getDepth() == 1)
     {return background;}
 
-    std::vector<float> clocal = illuminate(currRay, intersectPt, intersectObj);
+    // calculate normal to intersected sphere
+    std::vector<float> center = (std::vector<float>&) intersectObj[0];
+    std::vector<float> normal = {2 * (intersectPt[0] - center[0]), 2 * (intersectPt[1] - center[1]), 2 * (intersectPt[2] - center[2])};
 
+    // calculate the reflected ray
+    std::vector<float> incomingDir = currRay.getDirection();
+    scalarMult(-2 * (dot(normal, incomingDir)), normal);
+    std::vector<float> reflectedDir = add(normal, incomingDir);
+    Ray reflectedRay = Ray(intersectPt, reflectedDir);
+    reflectedRay.setDepth(currRay.getDepth() + 1);
 
+    // calculate the refracted ray
+
+    // calculate pixel colour
+    std::vector<float> clocal = illuminate(currRay, normal, intersectPt, intersectObj);
+    std::vector<float> colourRE = raytrace(reflectedRay);
+
+    scalarMult((float&) intersectObj[6], colourRE);
+    std::vector<float> screenColour = add(clocal, colourRE);
+    return screenColour;
 }
 
 int main(int argc, char **argv)
@@ -294,11 +314,12 @@ int main(int argc, char **argv)
     // close input file
     fclose(sceneData);
 
-    std::vector<float> colours(3 * resolution[0] * resolution[1], 0.0f);
+    unsigned char* colours;
+    colours = new unsigned char [3 * resolution[0] * resolution[1]];
     int counter = 0;
-    for (int i = 0; i < resolution[0]; i++)
+    for (int i = 1; i < resolution[0] + 1; i++)
     {
-        for (int j = 0; j < resolution[1]; j++)
+        for (int j = 1; j < resolution[1] + 1; j++)
         {
             float dirX = viewPlane[2] * (((float) (2 * i) / (float) resolution[0]) - 1);
             float dirY = viewPlane[4] * (((float) (2 * j) / (float) resolution[1]) - 1);
@@ -309,12 +330,14 @@ int main(int argc, char **argv)
 
             std::vector<float> screenColour = raytrace(ray);
 
-            colours[counter] = screenColour[0];
-            colours[counter+1] = screenColour[1];
-            colours[counter+2] = screenColour[2];
+            colours[counter] = (unsigned char) (screenColour[0] * 255.0);
+            colours[counter+1] = (unsigned char) (screenColour[1] * 255.0);
+            colours[counter+2] = (unsigned char) (screenColour[2] * 255.0);
             counter += 3;
         }
     }
+
+    save_imageP6(resolution[0], resolution[1], sceneName, colours);
 
     return 0;
 }
