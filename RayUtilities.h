@@ -76,7 +76,7 @@ std::vector<float> subtract(std::vector<float> vec1, std::vector<float> vec2)
     return std::vector<float>{vec1[0] - vec2[0], vec1[1] - vec2[1], vec1[2] - vec2[2]};
 }
 
-void scalarMult(float constant, std::vector<float> vec)
+void scalarMult(double constant, std::vector<float> vec)
 {
     for (int i = 0; i < 3; i++)
     {
@@ -86,8 +86,8 @@ void scalarMult(float constant, std::vector<float> vec)
 
 void normalize(std::vector<float> vec)
 {
-    auto magnitude = (float) sqrt(pow(vec[0], 2) + pow(vec[1], 2) + pow(vec[2], 2));
-    auto inverse_magnitude = (float) pow(magnitude, -1);
+    auto magnitude = sqrt(pow(vec[0], 2) + pow(vec[1], 2) + pow(vec[2], 2));
+    auto inverse_magnitude = pow(magnitude, -1);
     scalarMult(inverse_magnitude, vec);
 }
 
@@ -184,6 +184,7 @@ public:
 
             std::vector<float> TransPos = {homogenousTransPos[0], homogenousTransPos[1], homogenousTransPos[2]};
             std::vector<float> TransDir = {homogenousTransDir[0], homogenousTransDir[1], homogenousTransDir[2]};
+            //normalize(TransDir);
 
             return {TransPos, TransDir};
         }
@@ -201,10 +202,10 @@ public:
 public:
     std::vector<float> findPoint(float t)
     {
-       std::vector<float> pt = {0, 0, 0};
+       std::vector<float> pt = {0.0f, 0.0f, 0.0f};
        for (int i = 0; i < 3; i++)
        {
-           pt[i] = point[i] + t * direction[i];
+           pt[i] = point[i] + (t * direction[i]);
        }
 
         return pt;
