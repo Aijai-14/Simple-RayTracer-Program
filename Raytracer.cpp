@@ -122,32 +122,45 @@ void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std:
 
 float solveT(const Ray& ray)
 {
-    float a = dot(ray.getDirection(), ray.getDirection());
-    float b = dot(ray.getPoint(), ray.getDirection());
-    float c = dot(ray.getPoint(), ray.getPoint()) - 1; // -1
+    std::vector<float> origin = ray.getPoint();
+    std::vector<float> direction = ray.getDirection();
 
-    float discriminant = (float) pow(b, 2) - (a * c); //removed 4
+    float a = dot(direction, direction);
+    float b = 2 * dot(origin, direction);
+    float c = dot(origin, origin) - 1;
+
+    float discriminant = b * b - 4 * a * c;
     if (discriminant < 0)
     {
         return -INFINITY;
     }
-
-    else if (discriminant == 0)
-    {
-        if ((-b / (2*a)) > 1) {return (-b / (2*a));}
-        else {return -INFINITY;}
-    }
-
     else
     {
-        float t1 = (-b + sqrt(discriminant)) / (a);
-        float t2 = (-b - sqrt(discriminant)) / (a);
+        float sqrtDiscriminant = sqrt(discriminant);
+        float t1 = (-b - sqrtDiscriminant) / (2 * a);
+        float t2 = (-b + sqrtDiscriminant) / (2 * a);
 
-        if (t1 < t2 && t1 > 1) {return t1;}
-        else if (t2 < t1 && t2 > 1) {return t2;}
+        if (t1 > 1 && t1 < t2) {return t1;}
+        else if (t2 > 1 && t2 < t1) {return t2;}
         else {return -INFINITY;}
     }
 }
+
+// std::vector<float> transformPoint(double M[4][4], const std::vector<float>& point)
+// {
+//     std::vector<float> result(3, 0.0f);
+
+//     for (int i = 0; i < 3; i++)
+//     {
+//         for (int j = 0; j < 3; j++)
+//         {
+//             result[i] += M[i][j] * point[j];
+//         }
+//         result[i] += M[i][3];
+//     }
+
+//     return result;
+// }
 
 std::vector<std::variant<std::vector<float>, std::string>> Intersect(Ray& ray)
 {
@@ -170,6 +183,7 @@ std::vector<std::variant<std::vector<float>, std::string>> Intersect(Ray& ray)
         if (intersectionParameter == -INFINITY) { continue; }
 
         std::vector<float> intersectionPoint = ray.findPoint(intersectionParameter);
+        //intersectionPoint = transformPoint(M, intersectionPoint);
 
         if (equal(closest, std::vector<float>{0.0f, 0.0f, 0.0f}))
         {
@@ -215,7 +229,7 @@ std::vector<float> illuminate(Ray& viewRay, const std::vector<float>& normal, co
 {
     const std::vector<float>& viewDir = viewRay.getDirection();
     normalize(viewDir);
-    normalize(normal);
+    normalize(normal); 
 
     float Ka = (float&) (obj[3]);
     std::vector<float> colour = (std::vector<float>&) obj[2];
@@ -237,26 +251,23 @@ std::vector<float> illuminate(Ray& viewRay, const std::vector<float>& normal, co
 
         if (equal((std::vector<float>&) intersection[0], std::vector<float>{0.0f, 0.0f, 0.0f}))
         {
-            //currColour = {1.0f, 1.0f, 1.0f};
             std::vector<float> reflected = reflectionVector(normal, shadowDir);
             normalize(reflected);
-            normalize(normal);
 
             float redIntensity = (float &) light.second[1];
             float greenIntensity = (float &) light.second[2];
             float blueIntensity = (float &) light.second[3];
 
-            float diffuseRed = Kd * redIntensity * (dot(normal, shadowDir)) * colour[0];
-            float specularRed = (float) (Ks * redIntensity * pow(dot(reflected, viewDir), shininess));
-            float diffuseGreen = Kd * greenIntensity * (dot(normal, shadowDir)) * colour[1];
-            float specularGreen = (float) (Ks * greenIntensity * pow(dot(reflected, viewDir), shininess));
-            float diffuseBlue = Kd * blueIntensity * (dot(normal, shadowDir)) * colour[2];
-            float specularBlue = (float) (Ks * blueIntensity * pow(dot(reflected, viewDir), shininess));
+            float diffuseRed = Kd * redIntensity * std::max(dot(normal, shadowDir), 0.0f) * colour[0];
+            float specularRed = (float) (Ks * redIntensity * pow(std::max(dot(reflected, viewDir), 0.0f), shininess));
+            float diffuseGreen = Kd * greenIntensity * std::max(dot(normal, shadowDir), 0.0f) * colour[1];
+            float specularGreen = (float) (Ks * greenIntensity * pow(std::max(dot(reflected, viewDir), 0.0f), shininess));
+            float diffuseBlue = Kd * blueIntensity * std::max(dot(normal, shadowDir), 0.0f) * colour[2];
+            float specularBlue = (float) (Ks * blueIntensity * pow(std::max(dot(reflected, viewDir), 0.0f), shininess));
 
             currColour[0] += diffuseRed + specularRed;
             currColour[1] += diffuseGreen + specularGreen;
             currColour[2] += diffuseBlue + specularBlue;
-
         }
     }
 
@@ -305,7 +316,19 @@ std::vector<float> raytrace(Ray& currRay)
 
     scalarMult((float&) intersectObj[6], colourRE);
     std::vector<float> screenColour = add(clocal, colourRE);
+
+    // if (screenColour[0] > 1.0) {screenColour[0] = 1.0;}
+    // if (screenColour[1] > 1.0) {screenColour[1] = 1.0;}
+    // if (screenColour[2] > 1.0) {screenColour[2] = 1.0;}
+
     return screenColour;
+}
+
+float clamp(float value, float min, float max)
+{
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
 }
 
 int main(int argc, char **argv)
@@ -340,7 +363,7 @@ int main(int argc, char **argv)
             float dirZ = (-1) * viewPlane[0];
 
             std::vector<float> normalizedDir = {dirX, dirY, dirZ};
-            //normalize(normalizedDir);
+            normalize(normalizedDir);
             Ray ray = Ray(std::vector<float>{0, 0, 0}, normalizedDir);
 
             ray.setDepth(1);
