@@ -126,10 +126,10 @@ float solveT(const Ray& ray)
     std::vector<float> direction = ray.getDirection();
 
     float a = dot(direction, direction);
-    float b = 2 * dot(origin, direction);
+    float b = dot(origin, direction);
     float c = dot(origin, origin) - 1;
 
-    float discriminant = b * b - 4 * a * c;
+    float discriminant = b * b - a * c;
     if (discriminant < 0)
     {
         return -INFINITY;
@@ -137,11 +137,11 @@ float solveT(const Ray& ray)
     else
     {
         float sqrtDiscriminant = sqrt(discriminant);
-        float t1 = (-b - sqrtDiscriminant) / (2 * a);
-        float t2 = (-b + sqrtDiscriminant) / (2 * a);
+        float t1 = (-b - sqrtDiscriminant) / (a);
+        float t2 = (-b + sqrtDiscriminant) / (a);
 
-        if (t1 > 1 && t1 < t2) {return t1;}
-        else if (t2 > 1 && t2 < t1) {return t2;}
+        if (t1 > viewPlane[0] && t1 < t2) {return t1;}
+        else if (t2 > viewPlane[0] && t2 < t1) {return t2;}
         else {return -INFINITY;}
     }
 }
@@ -217,11 +217,12 @@ std::vector<std::variant<std::vector<float>, std::string>> Intersect(Ray& ray)
 
 std::vector<float> reflectionVector(const std::vector<float>& normal, const std::vector<float>& lightVector)
 {
+    normalize(normal); 
     float num = 2 * dot(normal, lightVector);
     scalarMult(num, normal);
     std::vector<float> reflected = subtract(normal, lightVector);
 
-    normalize(normal);
+    scalarMult(pow(num, -1), normal); 
     return reflected;
 }
 
@@ -229,7 +230,6 @@ std::vector<float> illuminate(Ray& viewRay, const std::vector<float>& normal, co
 {
     const std::vector<float>& viewDir = viewRay.getDirection();
     normalize(viewDir);
-    normalize(normal); 
 
     float Ka = (float&) (obj[3]);
     std::vector<float> colour = (std::vector<float>&) obj[2];
@@ -253,6 +253,7 @@ std::vector<float> illuminate(Ray& viewRay, const std::vector<float>& normal, co
         {
             std::vector<float> reflected = reflectionVector(normal, shadowDir);
             normalize(reflected);
+            normalize(normal); 
 
             float redIntensity = (float &) light.second[1];
             float greenIntensity = (float &) light.second[2];
@@ -297,29 +298,39 @@ std::vector<float> raytrace(Ray& currRay)
 
     auto intersectObj = geometryData.at((std::string &) intersectInfo[1]);
 
+    std::vector<float> position = reinterpret_cast<const std::vector<float> &>(intersectObj[0]);
+    std::vector<float> scale = reinterpret_cast<const std::vector<float> &>(intersectObj[1]);
+
+    double M[4][4] = {{scale[0], 0, 0, position[0]}, {0, scale[1], 0, position[1]},
+                     {0, 0, scale[2], position[2]}, {0, 0, 0, 1}};
+    double M_inverse[4][4] = {{0}};
+    double M_InverseTranspose[4][4] = {{0}};
+    invert_matrix(M, M_inverse);
+    transpose(M_inverse, M_InverseTranspose); 
+
     // calculate normal to intersected sphere
-    std::vector<float> center = (std::vector<float>&) intersectObj[0];
-    std::vector<float> normal = {2 * (intersectPt[0] - center[0]), 2 * (intersectPt[1] - center[1]), 2 * (intersectPt[2] - center[2])};
-    //normalize(normal);
+    std::vector<float> normal = MatrixVectorMult(M_InverseTranspose, MatrixVectorMult(M_inverse, intersectPt)); 
 
     // calculate the reflected ray
-    std::vector<float> incomingDir = currRay.getDirection();
-    scalarMult(-2 * (dot(normal, incomingDir)), normal);
-    std::vector<float> reflectedDir = add(normal, incomingDir);
-    Ray reflectedRay = Ray(intersectPt, reflectedDir);
-    reflectedRay.setDepth(currRay.getDepth() + 1);
-    normalize(normal);
+    // std::vector<float> incomingDir = currRay.getDirection();
+    // float dotProduct = -2 * (dot(normal, incomingDir)); 
+    // scalarMult(dotProduct, normal);
+    // std::vector<float> reflectedDir = add(normal, incomingDir);
+
+
+    // Ray reflectedRay = Ray(intersectPt, reflectedDir);
+    // reflectedRay.setDepth(currRay.getDepth() + 1);
+
+    //scalarMult(pow(dotProduct, -1), normal); 
+    //normalize(normal);
 
     // calculate pixel colour
     std::vector<float> clocal = illuminate(currRay, normal, intersectPt, (std::vector<std::variant<float, std::vector<float>>>&) intersectObj);
-    std::vector<float> colourRE = raytrace(reflectedRay);
-
-    scalarMult((float&) intersectObj[6], colourRE);
-    std::vector<float> screenColour = add(clocal, colourRE);
-
-    // if (screenColour[0] > 1.0) {screenColour[0] = 1.0;}
-    // if (screenColour[1] > 1.0) {screenColour[1] = 1.0;}
-    // if (screenColour[2] > 1.0) {screenColour[2] = 1.0;}
+    
+    // std::vector<float> colourRE = raytrace(reflectedRay);
+    // scalarMult((float&) intersectObj[6], colourRE);
+    
+    std::vector<float> screenColour = clocal; //add(clocal, colourRE); 
 
     return screenColour;
 }
@@ -354,12 +365,12 @@ int main(int argc, char **argv)
     unsigned char* colours;
     colours = new unsigned char [3 * resolution[0] * resolution[1]];
     int counter = 0;
-    for (int i = 1; i < resolution[0] + 1; i++)
+    for (int i = 0; i < resolution[1]; i++)
     {
-        for (int j = 1; j < resolution[1] + 1; j++)
+        for (int j = 0; j < resolution[0]; j++)
         {
-            float dirX = viewPlane[2] * (((float) (2 * i) / (float) resolution[0]) - 1);
-            float dirY = viewPlane[4] * (((float) (2 * j) / (float) resolution[1]) - 1);
+            float dirX = viewPlane[1] + (viewPlane[2] - viewPlane[1]) * j / resolution[0];
+            float dirY = viewPlane[4] + (viewPlane[3] - viewPlane[4]) * i / resolution[1]; 
             float dirZ = (-1) * viewPlane[0];
 
             std::vector<float> normalizedDir = {dirX, dirY, dirZ};

@@ -138,9 +138,24 @@ float dot(std::vector<float> vec1, std::vector<float> vec2)
 std::vector<float> MatrixVectorMult(double M[][4], const std::vector<float>& vec)
 {
     std::vector<float> output = {0.0f, 0.0f, 0.0f, 0.0f};
-    for (int i = 0; i < 4; i++)
+
+    if (vec.size() == 3) 
     {
-        output[i] = dot(M[i], vec);
+        std::vector<float> homogenousVec = vec; 
+        homogenousVec.push_back(1.0f);  
+
+        for (int i = 0; i < 4; i++)
+        {
+            output[i] = dot(M[i], homogenousVec);
+        }
+    }
+
+    else 
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            output[i] = dot(M[i], vec);
+        }
     }
 
     return output;
@@ -219,6 +234,17 @@ public:
  */
 
 #define SMALL_NUMBER    1.e-8
+
+void transpose(double M[4][4], double M_transpose[4][4])
+{
+    for (int i = 0; i < 4; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            M_transpose[j][i] = M[i][j];
+        }
+    }
+}
 
 //double det2x2( a, b, c, d)
 //   double a, b, c, d;
