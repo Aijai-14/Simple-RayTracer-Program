@@ -34,6 +34,57 @@ void save_imageP6(int Width, int Height, char* fname,unsigned char* pixels) {
     fclose(fp);
 }
 
+void printSceneInfo(float* vP, int* res, float* Ambient, 
+                    std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>>& gD,
+                    std::map<std::string, std::vector<std::variant<float, std::vector<float>>>>& lD,
+                    std::vector<float>& bG, char* Name)
+{
+    std::cout << "Viewport: ";
+    for (int i = 0; i < 5; i++) {
+        std::cout << vP[i] << " ";
+    }
+    std::cout << "\nResolution: " << res[0] << " " << res[1] << "\n";
+    std::cout << "Ambient: " << Ambient[0] << " " << Ambient[1] << " " << Ambient[2] << "\n";
+    std::cout << "Background: " << bG[0] << " " << bG[1] << " " << bG[2] << "\n";
+    std::cout << "Output: " << Name << "\n";
+
+    std::cout << "Spheres:\n";
+    for (const auto& sphere : gD) {
+        std::cout << "Name: " << sphere.first << "\n";
+        for (const auto& data : sphere.second) {
+            if (std::holds_alternative<int>(data)) {
+                std::cout << "n: " << std::get<int>(data) << "\n";
+            } else if (std::holds_alternative<float>(data)) {
+                std::cout << "KA, KD, KS, KR: " << std::get<float>(data) << "\n";
+            } else if (std::holds_alternative<std::vector<float>>(data)) {
+                std::vector<float> vec = std::get<std::vector<float>>(data);
+                std::cout << "Vector: ";
+                for (float f : vec) {
+                    std::cout << f << " ";
+                }
+                std::cout << "\n";
+            }
+        }
+    }
+
+    std::cout << "Lights:\n";
+    for (const auto& light : lD) {
+        std::cout << "Name: " << light.first << "\n";
+        for (const auto& data : light.second) {
+            if (std::holds_alternative<float>(data)) {
+                std::cout << "I_R, I_G, I_B: " << std::get<float>(data) << "\n";
+            } else if (std::holds_alternative<std::vector<float>>(data)) {
+                std::vector<float> vec = std::get<std::vector<float>>(data);
+                std::cout << "Position: ";
+                for (float f : vec) {
+                    std::cout << f << " ";
+                }
+                std::cout << "\n";
+            }
+        }
+    }
+}
+
 // Output in P3 format, a text file containing:
 // P3
 // ncolumns nrows
@@ -82,6 +133,16 @@ void scalarMult(double constant, std::vector<float> vec)
     {
         vec[i] = constant * vec[i];
     }
+}
+
+std::vector<float> getScaledVec(double constant, std::vector<float> vec)
+{
+    std::vector<float> scaledVec = vec;
+    for (int i = 0; i < 3; i++)
+    {
+        scaledVec[i] = constant * vec[i];
+    }
+    return scaledVec;
 }
 
 void normalize(std::vector<float> vec)
