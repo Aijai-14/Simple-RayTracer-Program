@@ -24,6 +24,9 @@ std::map<std::string, std::vector<std::variant<float, std::vector<float>>>> ligh
 std::vector<float> background;
 char sceneName[20];
 
+
+//Scans and gets the data from the text file by comparing strings and key variables line by line and then storing the 
+//scanned values in an array and hashmaps
 void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std::string,
         std::vector<std::variant<float, int, std::vector<float>>>>& gD,
         std::map<std::string, std::vector<std::variant<float, std::vector<float>>>>& lD,
@@ -53,6 +56,7 @@ void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std:
     char temp[100];
     while (fgets(line, sizeof(line), file))
     {
+        //scanning and comparing strings from text file
         sscanf(line, "%s", temp);
         if (strcmp(temp, "SPHERE") == 0)
         {
@@ -60,6 +64,8 @@ void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std:
             std::string name;
             float pos_x, pos_y, pos_z, scl_x, scl_y, scl_z, red, green, blue, KA, KD, KS, KR;
             int n;
+
+            //allocating scanned data into arrays and hashmaps
             sscanf(line, "SPHERE %s %f %f %f %f %f %f %f %f %f %f %f %f %f %d",
                    temp, &pos_x, &pos_y, &pos_z, &scl_x, &scl_y, &scl_z,
                    &red, &green, &blue, &KA, &KD, &KS, &KR, &n);
@@ -76,11 +82,14 @@ void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std:
             gD[name] = currSphere;
         }
 
+        //comparing string from text file line by line
         else if (strcmp(temp, "LIGHT") == 0)
         {
             std::vector<std::variant<float, std::vector<float>>> currLightSource;
             std::string name;
             float pos_x, pos_y, pos_z, I_R, I_G, I_B;
+
+            //allocating scanned data into arrays and hashmaps
             sscanf(line, "LIGHT %s %f %f %f %f %f %f", temp, &pos_x, &pos_y, &pos_z, &I_R, &I_G, &I_B);
 
             name = temp;
@@ -91,24 +100,31 @@ void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std:
             lD[name] = currLightSource;
         }
 
+         //comparing string from text file line by line
         else if (strcmp(temp, "BACK") == 0)
         {
             float red, green, blue;
+
+            //allocating scanned data into arrays and hashmaps
             sscanf(line, "BACK %f %f %f", &red, &green, &blue);
             bG.push_back(red);
             bG.push_back(green);
             bG.push_back(blue);
         }
 
+         //comparing string from text file line by line
         else if (strcmp(temp, "AMBIENT") == 0)
         {
             float AR, AG, AB;
+
+            //allocating scanned data into arrays
             sscanf(line, "AMBIENT %f %f %f", &AR, &AG, &AB);
             Ambient[0] = AR;
             Ambient[1] = AG;
             Ambient[2] = AB;
         }
 
+         //comparing string from text file line by line
         else if (strcmp(temp, "OUTPUT") == 0)
         {
             sscanf(line, "OUTPUT %s", Name);
@@ -120,6 +136,8 @@ void getSceneInfo(FILE* file, float* vP, int* res, float* Ambient, std::map<std:
     }
 }
 
+
+//solve for t by calculating how many roots there are using the quadratic equation
 float solveT(const Ray& ray)
 {
     std::vector<float> origin = ray.getPoint();
@@ -145,6 +163,9 @@ float solveT(const Ray& ray)
         {
             return -INFINITY;
         }
+        else if(discriminant == 0){
+            return -b/(2*a);
+        }
         else
         {
             return std::max(t, 1.0f);
@@ -152,6 +173,8 @@ float solveT(const Ray& ray)
     }
 }
 
+
+//calculates the intersection point from the given ray
 std::vector<std::variant<std::vector<float>, std::string>> Intersect(Ray& ray)
 {
     std::vector<float> closest = {0.0f, 0.0f, 0.0f};
@@ -169,6 +192,7 @@ std::vector<std::variant<std::vector<float>, std::string>> Intersect(Ray& ray)
 
         Ray transRay = ray.getTransformedRay(M_inverse);
 
+        //solve for t by calculating how many roots there are using the quadratic equation
         float intersectionParameter = solveT(transRay);
         if (intersectionParameter == -INFINITY) { continue; }
 
@@ -205,8 +229,10 @@ std::vector<std::variant<std::vector<float>, std::string>> Intersect(Ray& ray)
     return closestIntersection;
 }
 
+//calculates the reflection vector by taking the given normal vector and light vector
 std::vector<float> reflectionVector(std::vector<float>& normal, const std::vector<float>& lightVector)
-{
+{   
+    //normalizig the normal vector
     normalize(normal); 
     float num = 2 * dot(normal, lightVector);
     scalarMult(num, normal);
@@ -216,6 +242,7 @@ std::vector<float> reflectionVector(std::vector<float>& normal, const std::vecto
     return reflected;
 }
 
+//calculates the pixel color by gathering information from the ray, normal, intersection point and intersection object
 std::vector<float> illuminate(Ray& viewRay, std::vector<float>& normal, const std::vector<float>& point, std::vector<std::variant<float, std::vector<float>>>& obj)
 {
     //const std::vector<float>& viewDir = getScaledVec(-1.0, viewRay.getDirection());
@@ -240,11 +267,16 @@ std::vector<float> illuminate(Ray& viewRay, std::vector<float>& normal, const st
 
         normalize(shadowDir);
         Ray shadowRay = Ray(point, shadowDir);
+
+        //calculates the intersection point
         std::vector<std::variant<std::vector<float>, std::string>> intersection = Intersect(shadowRay);
 
         if (equal((std::vector<float>&) intersection[0], std::vector<float>{0.0f, 0.0f, 0.0f}))
         {
+            //calculates the reflection vector
             std::vector<float> reflected = reflectionVector(normal, shadowDir);
+
+            //normalizing the vectors
             normalize(reflected);
             normalize(viewDir);
             normalize(normal); 
@@ -295,10 +327,12 @@ std::vector<float> illuminate(Ray& viewRay, std::vector<float>& normal, const st
     return pixelColour;
 }
 
+//Returns the raytaced screen colour from the given current ray
 std::vector<float> raytrace(Ray& currRay)
 {
     if (currRay.getDepth() >= MAX_DEPTH) {return std::vector<float>{0.0f, 0.0f, 0.0f};}
 
+    //calculates the intersection point
     std::vector<std::variant<std::vector<float>, std::string>> intersectInfo = Intersect(currRay);
     std::vector<float> intersectPt = (std::vector<float>&) intersectInfo[0];
 
@@ -396,11 +430,15 @@ int main(int argc, char **argv)
             float dirZ = (-1) * viewPlane[0];
 
             std::vector<float> normalizedDir = {dirX, dirY, dirZ};
+
+            //normalizing the normal vector
             normalize(normalizedDir);
+            
             Ray ray = Ray(std::vector<float>{0, 0, 0}, normalizedDir);
 
             ray.setDepth(1);
 
+            //Returns the raytaced screen colour from the given current ray
             std::vector<float> screenColour = raytrace(ray);
 
             colours[counter] = (unsigned char) (screenColour[0] * 255.0);
