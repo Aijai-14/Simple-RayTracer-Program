@@ -1,10 +1,6 @@
 #include <utility>
 #include <cmath>
 
-//
-// Created by Aijaisarma Sabaratnasarma on 2023-11-29.
-//
-
 #ifndef SIMPLE_RAYTRACER_PROGRAM_RAYCLASS_H
 #define SIMPLE_RAYTRACER_PROGRAM_RAYCLASS_H
 
@@ -34,6 +30,7 @@ void save_imageP6(int Width, int Height, char* fname,unsigned char* pixels) {
     fclose(fp);
 }
 
+// a test function to check if all values in text file were extracted correctly by printing them on terminal 
 void printSceneInfo(float* vP, int* res, float* Ambient, 
                     std::map<std::string, std::vector<std::variant<float, int, std::vector<float>>>>& gD,
                     std::map<std::string, std::vector<std::variant<float, std::vector<float>>>>& lD,
@@ -117,16 +114,19 @@ void save_imageP3(int Width, int Height, char* fname,unsigned char* pixels) {
     fclose(fp);
 }
 
+// function to return sum of 2 vectors 
 std::vector<float> add(std::vector<float> vec1, std::vector<float> vec2)
 {
     return std::vector<float>{vec1[0] + vec2[0], vec1[1] + vec2[1], vec1[2] + vec2[2]};
 }
 
+// function to return difference of 2 vectors
 std::vector<float> subtract(std::vector<float> vec1, std::vector<float> vec2)
 {
     return std::vector<float>{vec1[0] - vec2[0], vec1[1] - vec2[1], vec1[2] - vec2[2]};
 }
 
+// function to multiple input vector by scalar constant
 void scalarMult(double constant, std::vector<float> vec)
 {
     for (int i = 0; i < 3; i++)
@@ -135,6 +135,7 @@ void scalarMult(double constant, std::vector<float> vec)
     }
 }
 
+// function to return a scaled vector given a vector and scalar constant
 std::vector<float> getScaledVec(double constant, std::vector<float> vec)
 {
     std::vector<float> scaledVec = vec;
@@ -145,35 +146,46 @@ std::vector<float> getScaledVec(double constant, std::vector<float> vec)
     return scaledVec;
 }
 
+// function to return a normalized vector. 
 void normalize(std::vector<float> vec)
 {
+    // calculate inverse magnitude of vector
     auto magnitude = sqrt(pow(vec[0], 2) + pow(vec[1], 2) + pow(vec[2], 2));
     auto inverse_magnitude = pow(magnitude, -1);
+
+    // divide vector by inverse magnitude
     scalarMult(inverse_magnitude, vec);
 }
 
+// function to calculate which vector is closer to the eye (origin) 
 bool closestToEye(std::vector<float> vec1, std::vector<float> vec2) {
 
+    // calculate distance of each vector from origin
     auto dis1 = (float) sqrt(pow(vec1[0], 2) + pow(vec1[1], 2) + pow(vec1[2], 2));
     auto dis2 = (float) sqrt(pow(vec2[0], 2) + pow(vec2[1], 2) + pow(vec2[2], 2));
 
+    // return true if vec1 is closer to origin and false if otherwise
     if (dis1 < dis2) {return true;}
     else {return false;}
 }
 
+// function to check if 2 vectors are equal
 bool equal(std::vector<float> vec1, std::vector<float> vec2)
 {
     for (int i = 0; i < 3; i++)
     {
+        // if any of the elements are not equal, return false
         if (vec1[i] != vec2[i])
         {
             return false;
         }
     }
 
+    // otherwise return true
     return true;
 }
 
+// function to calculate dot product of 2 vectors
 float dot(const double *vec1, std::vector<float> vec2)
 {
 
@@ -185,6 +197,7 @@ float dot(const double *vec1, std::vector<float> vec2)
     return product;
 }
 
+// function to calculate dot product of 2 vectors (overloaded)
 float dot(std::vector<float> vec1, std::vector<float> vec2)
 {
 
@@ -196,21 +209,26 @@ float dot(std::vector<float> vec1, std::vector<float> vec2)
     return product;
 }
 
+// function to calculate a matrix product with vector and return the result
 std::vector<float> MatrixVectorMult(double M[][4], const std::vector<float>& vec)
 {
+    // initialize output vector to 0s
     std::vector<float> output = {0.0f, 0.0f, 0.0f, 0.0f};
 
+    // if vector is 3D, convert to homogenous coordinates
     if (vec.size() == 3) 
     {
         std::vector<float> homogenousVec = vec; 
         homogenousVec.push_back(1.0f);  
 
+        // calculate matrix product by taking dot product of each row of matrix with vector
         for (int i = 0; i < 4; i++)
         {
             output[i] = dot(M[i], homogenousVec);
         }
     }
 
+    // if vector is already homogenous, calculate matrix product by taking dot product of each row of matrix with vector
     else 
     {
         for (int i = 0; i < 4; i++)
@@ -222,12 +240,15 @@ std::vector<float> MatrixVectorMult(double M[][4], const std::vector<float>& vec
     return output;
 }
 
+// A class for a ray object that has a initial point and direction and depth. 
 class Ray {
+    // private variables for point, direction, and depth
     private:
         std::vector<float> point;
         std::vector<float> direction;
         int depth = 0;
 
+    // public constructor for ray object
     public:
         Ray(std::vector<float> pt, std::vector<float> dir)
             {
@@ -235,6 +256,7 @@ class Ray {
                     direction = std::move(dir);
             }
 
+    // setter and getter functions for depth
     public:
         void setDepth(int d)
         {
@@ -248,23 +270,27 @@ class Ray {
         }
 
 public:
+        // function to return a transformed ray given a transformation matrix
         Ray getTransformedRay(double M[][4])
         {
+            // convert point and direction to homogenous coordinates
             std::vector<float> homogenousPos = point;
             homogenousPos.push_back(1.0f);
             std::vector<float> homogenousDir = direction;
             homogenousDir.push_back(0.0f);
 
+            // calculate transformed point and direction in homogeneous coordinates
             std::vector<float> homogenousTransPos = MatrixVectorMult(M, homogenousPos);
             std::vector<float> homogenousTransDir = MatrixVectorMult(M, homogenousDir);
 
+            // convert transformed point and direction back to 3D coordinates
             std::vector<float> TransPos = {homogenousTransPos[0], homogenousTransPos[1], homogenousTransPos[2]};
             std::vector<float> TransDir = {homogenousTransDir[0], homogenousTransDir[1], homogenousTransDir[2]};
-            //normalize(TransDir);
 
             return {TransPos, TransDir};
         }
 
+// getter functions for point and direction
 public:
     const std::vector<float> &getPoint() const {
         return point;
@@ -276,6 +302,7 @@ public:
     }
 
 public:
+    // function to find a point on the ray given a t value
     std::vector<float> findPoint(float t)
     {
        std::vector<float> pt = {0.0f, 0.0f, 0.0f};
@@ -296,6 +323,7 @@ public:
 
 #define SMALL_NUMBER    1.e-8
 
+// function to transpose a matrix by switching rows and columns
 void transpose(double M[4][4], double M_transpose[4][4])
 {
     for (int i = 0; i < 4; i++)
